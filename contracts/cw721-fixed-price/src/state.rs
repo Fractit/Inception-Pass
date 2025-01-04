@@ -8,8 +8,11 @@ use cw_storage_plus::{Item, Map};
 #[cw_serde]
 pub struct Config {
     pub owner: Addr,
+    pub denom1: String,
+    pub denom2: String,
     pub cw721_address: Option<Addr>,
-    pub unit_price: Uint128,
+    pub unit_price1: Uint128,
+    pub unit_price2: Uint128,
     pub name: String,
     pub symbol: String,
     pub token_uri: String,

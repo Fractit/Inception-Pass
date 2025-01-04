@@ -6,7 +6,10 @@ use cw721::state::DefaultOptionMetadataExtension;
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Addr,
-    pub unit_price: Uint128,
+    pub denom1: String,
+    pub denom2: String,
+    pub unit_price1: Uint128,
+    pub unit_price2: Uint128,
     pub name: String,
     pub symbol: String,
     pub token_code_id: u64,
@@ -17,9 +20,16 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Mint {},
-    ChangeStatus { mint_pause: bool },
-    ChangePrice { new_price: Uint128 },
+    Mint {
+        denom: String,
+    },
+    ChangeStatus {
+        mint_pause: bool,
+    },
+    ChangePrice {
+        new_price1: Option<Uint128>,
+        new_price2: Option<Uint128>,
+    },
 }
 
 #[cw_serde]
@@ -39,7 +49,10 @@ pub struct BalanceOfResponse {
 pub struct ConfigResponse {
     pub owner: Addr,
     pub cw721_address: Option<Addr>,
-    pub unit_price: Uint128,
+    pub denom1: String,
+    pub denom2: String,
+    pub unit_price1: Uint128,
+    pub uint_price2: Uint128,
     pub name: String,
     pub symbol: String,
     pub token_uri: String,

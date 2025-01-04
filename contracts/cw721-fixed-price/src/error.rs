@@ -16,6 +16,9 @@ pub enum ContractError {
     #[error("Onyl Owner can call the function")]
     NotOwner {},
 
+    #[error("Entered Wrong Denom")]
+    WrongDenom {},
+
     #[error("Minting is Paused")]
     MintPaused {},
 
