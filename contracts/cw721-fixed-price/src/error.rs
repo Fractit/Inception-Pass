@@ -13,6 +13,12 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Onyl Owner can call the function")]
+    NotOwner {},
+
+    #[error("Minting is Paused")]
+    MintPaused {},
+
     #[error("InvalidUnitPrice")]
     InvalidUnitPrice {},
 
@@ -39,7 +45,7 @@ pub enum ContractError {
 
     #[error("Cw721AlreadyLinked")]
     Cw721AlreadyLinked {},
-    
+
     #[error("Cw721CallFailed")]
     Cw721CallFailed {},
 }

@@ -3,15 +3,12 @@ use cosmwasm_std::{Addr, Uint128};
 // expose to all others using contract, so others dont need to import cw721
 pub use cw721::state::*;
 
-use cw_storage_plus::Item;
-
-
+use cw_storage_plus::{Item, Map};
 
 #[cw_serde]
 pub struct Config {
     pub owner: Addr,
     pub cw721_address: Option<Addr>,
-    pub max_tokens: u32,
     pub unit_price: Uint128,
     pub name: String,
     pub symbol: String,
@@ -21,3 +18,6 @@ pub struct Config {
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
+pub const MINTSTATUS: Item<bool> = Item::new("mintstatus");
+pub const BALANCE: Map<&Addr, u128> = Map::new("balance");
+pub const TOTALMINT: Item<u128> = Item::new("totalmint");

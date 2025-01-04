@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::error::ContractError;
-use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG};
+use crate::msg::{BalanceOfResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{Config, BALANCE, CONFIG, MINTSTATUS, TOTALMINT};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -35,14 +35,9 @@ pub fn instantiate(
         return Err(ContractError::InvalidUnitPrice {});
     }
 
-    if msg.max_tokens == 0 {
-        return Err(ContractError::InvalidMaxTokens {});
-    }
-
     let config = Config {
         cw721_address: None,
         unit_price: msg.unit_price,
-        max_tokens: msg.max_tokens,
         owner: info.sender,
         name: msg.name.clone(),
         symbol: msg.symbol.clone(),
@@ -99,22 +94,32 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetConfig {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::BalanceOf { user } => to_json_binary(&quere_balance(deps, user)?),
     }
 }
 
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage)?;
+    let total_mint = TOTALMINT.load(deps.storage).unwrap_or_default();
     Ok(ConfigResponse {
         owner: config.owner,
         cw721_address: config.cw721_address,
-        max_tokens: config.max_tokens,
         unit_price: config.unit_price,
         name: config.name,
         symbol: config.symbol,
         token_uri: config.token_uri,
+        total_mint: total_mint,
         extension: config.extension,
         unused_token_id: config.unused_token_id,
     })
+}
+
+fn quere_balance(deps: Deps, user: Addr) -> StdResult<BalanceOfResponse> {
+    let balance = BALANCE.load(deps.storage, &user).unwrap_or_default();
+
+    let balance_response = BalanceOfResponse { balance: balance };
+
+    Ok(balance_response)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -126,11 +131,54 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Mint {} => execute_mint(deps, info),
+        ExecuteMsg::ChangeStatus { mint_pause } => execute_change_status(deps, info, mint_pause),
+        ExecuteMsg::ChangePrice { new_price } => execute_change_price(deps, info, new_price),
     }
+}
+
+fn execute_change_price(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_price: Uint128,
+) -> Result<Response, ContractError> {
+    let mut config = CONFIG.load(deps.storage)?;
+
+    let sender = info.sender;
+
+    if sender != config.owner {
+        return Err(ContractError::NotOwner {});
+    }
+
+    config.unit_price = new_price;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attribute("ChangePirce", new_price))
+}
+
+fn execute_change_status(
+    deps: DepsMut,
+    info: MessageInfo,
+    mint_pause: bool,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    let sender = info.sender;
+
+    if sender != config.owner {
+        return Err(ContractError::NotOwner {});
+    }
+
+    MINTSTATUS.save(deps.storage, &mint_pause)?;
+
+    Ok(Response::new().add_attribute("ChangeStatus", mint_pause.to_string()))
 }
 
 pub fn execute_mint(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
+    let mint_status = MINTSTATUS.load(deps.storage).unwrap_or_default();
+
+    if mint_status {
+        return Err(ContractError::MintPaused {});
+    }
 
     let amount = must_pay(&info, "uxion").map_err(|_| ContractError::WrongPaymentAmount {})?;
 
@@ -138,13 +186,19 @@ pub fn execute_mint(deps: DepsMut, info: MessageInfo) -> Result<Response, Contra
         return Err(ContractError::Uninitialized {});
     }
 
-    if config.unused_token_id >= config.max_tokens {
-        return Err(ContractError::SoldOut {});
-    }
-
     if amount != config.unit_price {
         return Err(ContractError::WrongPaymentAmount {});
     }
+
+    let user = info.sender.clone();
+
+    let minted = BALANCE.load(deps.storage, &user).unwrap_or_default();
+
+    BALANCE.save(deps.storage, &user, &(minted + 1))?;
+
+    let total_mint = TOTALMINT.load(deps.storage).unwrap_or_default();
+
+    TOTALMINT.save(deps.storage, &(&total_mint + 1))?;
 
     let mint_msg = Cw721ExecuteMsg::<DefaultOptionMetadataExtension, Empty>::Mint {
         token_id: config.unused_token_id.to_string(),
